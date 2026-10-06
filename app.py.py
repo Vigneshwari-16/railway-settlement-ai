@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -75,6 +76,62 @@ REQUIRED = [
 ]
 FEATURES = REQUIRED[:-1]
 MODEL_PATH = Path("models/random_forest_settlement.pkl")
+DEMO_CSV = """load_kn,frequency_hz,cycles,ballast_thickness_mm,clay_strength_kpa,ballast_density_kgm3,geogrid_present,geogrid_position,settlement_mm
+50,2,1000,300,25,1700,0,none,8.42
+60,2,1500,300,25,1700,0,none,9.85
+70,2,2000,300,25,1700,0,none,11.26
+80,3,2500,300,25,1700,0,none,12.94
+90,3,3000,300,25,1700,0,none,14.51
+100,3,3500,300,25,1700,0,none,16.18
+50,2,1000,350,30,1750,1,base,6.72
+60,2,1500,350,30,1750,1,base,7.54
+70,2,2000,350,30,1750,1,base,8.63
+80,3,2500,350,30,1750,1,base,9.72
+90,3,3000,350,30,1750,1,base,10.84
+100,3,3500,350,30,1750,1,base,12.05
+50,2,1000,400,35,1800,1,middle,5.31
+60,2,1500,400,35,1800,1,middle,6.08
+70,2,2000,400,35,1800,1,middle,6.91
+80,3,2500,400,35,1800,1,middle,7.83
+90,3,3000,400,35,1800,1,middle,8.76
+100,3,3500,400,35,1800,1,middle,9.64
+60,4,2000,300,20,1650,0,none,12.38
+80,4,3000,300,20,1650,0,none,15.87
+100,4,4000,300,20,1650,0,none,19.42
+60,4,2000,350,30,1750,1,top,7.18
+80,4,3000,350,30,1750,1,top,9.36
+100,4,4000,350,30,1750,1,top,11.52
+70,5,2500,400,40,1850,1,middle,6.45
+90,5,3500,400,40,1850,1,middle,8.12
+110,5,4500,400,40,1850,1,middle,10.07
+"""
+
+def get_demo_data():
+    from io import StringIO
+    return pd.read_csv(StringIO(DEMO_CSV))
+
+def load_demo_data():
+    demo_path = Path("data/demo_settlement_dataset.csv")
+    try:
+        if demo_path.exists() and demo_path.stat().st_size > 20:
+            df = pd.read_csv(demo_path)
+            if len(df.columns) > 1 and not df.empty:
+                return df
+    except Exception:
+        pass
+    return get_demo_data()
+
+def train_full_demo_model():
+    df = clean(get_demo_data())
+    X = encode(df)
+    y = df["settlement_mm"].astype(float)
+    model = RandomForestRegressor(n_estimators=300, random_state=42, n_jobs=-1)
+    model.fit(X, y)
+    MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(MODEL_PATH, "wb") as f:
+        pickle.dump({"model": model, "columns": list(X.columns)}, f)
+    return model, list(X.columns)
+
 
 def clean(df):
     df=df.copy()
@@ -172,8 +229,18 @@ elif page=="Random Forest Model":
 
     uploaded=st.file_uploader("Upload numerical dataset (CSV)",type=["csv"])
     demo=st.checkbox("Use included demo dataset")
-    df=pd.read_csv(uploaded) if uploaded else (
-        pd.read_csv("data/demo_settlement_dataset.csv") if demo else None)
+    if uploaded:
+        try:
+            df=pd.read_csv(uploaded)
+        except pd.errors.EmptyDataError:
+            st.warning("Uploaded CSV is empty. Please upload a valid dataset.")
+            st.stop()
+    elif demo:
+        df=load_demo_data()
+        if not Path("data/demo_settlement_dataset.csv").exists() or Path("data/demo_settlement_dataset.csv").stat().st_size <= 20:
+            st.info("Using the built-in illustrative demo dataset because the repository CSV is empty.")
+    else:
+        df=None
 
     if df is None:
         st.markdown('<div class="info-box">Upload your PLAXIS/experimental CSV dataset to begin.</div>',unsafe_allow_html=True)
@@ -470,15 +537,20 @@ elif page=="Comparison & Validation":
 
 
 elif page=="Settlement Predictor":
-    hero("Settlement Predictor","Estimate subgrade settlement using the trained Random Forest model.")
+    hero("Settlement Predictor","Estimate subgrade settlement using the Random Forest model.")
 
     if not MODEL_PATH.exists():
-        st.markdown('<div class="info-box">Train the Random Forest model first.</div>',unsafe_allow_html=True)
-        st.stop()
-
-    with open(MODEL_PATH,"rb") as f:
-        bundle=pickle.load(f)
-    model,columns=bundle["model"],bundle["columns"]
+        st.info("No saved model found. Training the Random Forest automatically from the built-in illustrative demo dataset...")
+        model,columns=train_full_demo_model()
+        st.success("Demo Random Forest model is ready. You can now enter engineering parameters.")
+    else:
+        try:
+            with open(MODEL_PATH,"rb") as f:
+                bundle=pickle.load(f)
+            model,columns=bundle["model"],bundle["columns"]
+        except Exception:
+            st.warning("Saved model could not be loaded. Rebuilding the demo Random Forest model...")
+            model,columns=train_full_demo_model()
 
     st.markdown('<div class="section-title">Engineering Parameters</div>',unsafe_allow_html=True)
     a,b,c=st.columns(3)
