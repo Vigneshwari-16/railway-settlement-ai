@@ -40,8 +40,16 @@ st.markdown("""
     margin-bottom:12px;border:1px solid rgba(255,255,255,.18);
 }
 .card {
-    background:white;border:1px solid #e6edf5;border-radius:18px;
-    padding:20px 22px;box-shadow:0 7px 25px rgba(18,44,72,.07);
+    background:white !important;
+    color:#10233e !important;
+    border:1px solid #e6edf5;
+    border-radius:18px;
+    padding:20px 22px;
+    box-shadow:0 7px 25px rgba(18,44,72,.07);
+}
+
+.card * {
+    color:#10233e !important;
 }
 .metric-title {color:#64748b;font-size:13px;font-weight:600;}
 .metric-value {font-size:27px;font-weight:800;color:#10233e;margin-top:5px;}
