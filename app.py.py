@@ -67,7 +67,23 @@ st.markdown("""
 }
 .stButton>button:hover {background:#084e6a;color:white;}
 div[data-testid="stMetric"] {
-    background:#fff;border:1px solid #e5edf5;border-radius:15px;padding:14px;
+    background:#fff !important;
+    border:1px solid #e5edf5;
+    border-radius:15px;
+    padding:14px;
+}
+
+div[data-testid="stMetric"] label,
+div[data-testid="stMetric"] label p {
+    color:#64748b !important;
+}
+
+div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+    color:#10233e !important;
+}
+
+div[data-testid="stMetric"] [data-testid="stMetricDelta"] {
+    color:#10233e !important;
 }
 </style>
 """, unsafe_allow_html=True)
