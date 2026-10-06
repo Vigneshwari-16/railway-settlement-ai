@@ -19,6 +19,27 @@ st.set_page_config(
 # ---------- PREMIUM UI ----------
 st.markdown("""
 <style>
+/* FORCE LIGHT THEME */
+.stApp {
+    background:#f7f9fc !important;
+    color:#10233e !important;
+}
+
+.main {
+    background:#f7f9fc !important;
+}
+
+.block-container {
+    background:#f7f9fc !important;
+}
+
+[data-testid="stAppViewContainer"] {
+    background:#f7f9fc !important;
+}
+
+[data-testid="stHeader"] {
+    background:#f7f9fc !important;
+}
 #MainMenu, footer {visibility:hidden;}
 [data-testid="stSidebar"] {
     background: linear-gradient(180deg,#07111f 0%,#0d1d32 100%);
