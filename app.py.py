@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -20,26 +19,7 @@ st.set_page_config(
 st.markdown("""
 <style>
 /* FORCE LIGHT THEME */
-.stApp {
-    background:#f7f9fc !important;
-    color:#10233e !important;
-}
-
-.main {
-    background:#f7f9fc !important;
-}
-
-.block-container {
-    background:#f7f9fc !important;
-}
-
-[data-testid="stAppViewContainer"] {
-    background:#f7f9fc !important;
-}
-
-[data-testid="stHeader"] {
-    background:#f7f9fc !important;
-}
+.stApp, .main, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {background:#f7f9fc !important; color:#10233e !important;}
 #MainMenu, footer {visibility:hidden;}
 [data-testid="stSidebar"] {
     background: linear-gradient(180deg,#07111f 0%,#0d1d32 100%);
@@ -61,16 +41,8 @@ st.markdown("""
     margin-bottom:12px;border:1px solid rgba(255,255,255,.18);
 }
 .card {
-    background:white !important;
-    color:#10233e !important;
-    border:1px solid #e6edf5;
-    border-radius:18px;
-    padding:20px 22px;
-    box-shadow:0 7px 25px rgba(18,44,72,.07);
-}
-
-.card * {
-    color:#10233e !important;
+    background:white;border:1px solid #e6edf5;border-radius:18px;
+    padding:20px 22px;box-shadow:0 7px 25px rgba(18,44,72,.07);
 }
 .metric-title {color:#64748b;font-size:13px;font-weight:600;}
 .metric-value {font-size:27px;font-weight:800;color:#10233e;margin-top:5px;}
@@ -88,24 +60,11 @@ st.markdown("""
 }
 .stButton>button:hover {background:#084e6a;color:white;}
 div[data-testid="stMetric"] {
-    background:#fff !important;
-    border:1px solid #e5edf5;
-    border-radius:15px;
-    padding:14px;
+    background:#fff !important;border:1px solid #e5edf5;border-radius:15px;padding:14px;
 }
-
-div[data-testid="stMetric"] label,
-div[data-testid="stMetric"] label p {
-    color:#64748b !important;
-}
-
-div[data-testid="stMetric"] [data-testid="stMetricValue"] {
-    color:#10233e !important;
-}
-
-div[data-testid="stMetric"] [data-testid="stMetricDelta"] {
-    color:#10233e !important;
-}
+div[data-testid="stMetric"] label, div[data-testid="stMetric"] label p {color:#64748b !important;}
+div[data-testid="stMetric"] [data-testid="stMetricValue"] {color:#10233e !important;}
+div[data-testid="stMetric"] [data-testid="stMetricDelta"] {color:#10233e !important;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -147,7 +106,8 @@ with st.sidebar:
         "Dashboard",
         "Random Forest Model",
         "PLAXIS Results",
-        "Settlement Predictor"
+        "Settlement Predictor",
+        "Comparison & Validation"
     ])
     st.markdown("---")
     st.caption("AI Engine")
@@ -244,6 +204,7 @@ elif page=="Random Forest Model":
             pickle.dump({"model":model,"columns":list(X.columns)},f)
 
         res=pd.DataFrame({"Actual Settlement (mm)":yte.values,"Predicted Settlement (mm)":pred})
+        Path("results").mkdir(parents=True, exist_ok=True)
         res.to_csv("results/test_predictions.csv",index=False)
 
         a,b,c=st.columns(3)
@@ -259,176 +220,254 @@ elif page=="Random Forest Model":
         st.download_button("⬇️ Download Predictions",res.to_csv(index=False),"test_predictions.csv","text/csv")
 
 elif page=="PLAXIS Results":
-    hero("PLAXIS Result Analysis","Upload PLAXIS 2D output screenshots and compare numerical settlement with experimental or demo data.")
+    hero("PLAXIS Result Viewer","Upload and present PLAXIS Output screenshots phase-by-phase.")
+
+    files=st.file_uploader(
+        "Upload PLAXIS result images",
+        type=["jpg","jpeg","png"],
+        accept_multiple_files=True
+    )
+
+    if files:
+        for start in range(0,len(files),2):
+            cols=st.columns(2)
+            for j,file in enumerate(files[start:start+2]):
+                with cols[j]:
+                    st.markdown(f'<div class="card"><h4>📌 {file.name}</h4>',unsafe_allow_html=True)
+                    st.image(Image.open(file),use_container_width=True)
+                    st.text_input("Phase / result label",
+                                  placeholder="Example: 90 Days • Total displacement uy",
+                                  key=f"label_{start+j}")
+                    st.markdown("</div>",unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div class="card" style="text-align:center;padding:50px">
+        <div style="font-size:55px">🖼️</div>
+        <h3>PLAXIS Output Gallery</h3>
+        <p style="color:#64748b">Upload JPG, JPEG or PNG result screenshots.</p>
+        </div>
+        """,unsafe_allow_html=True)
+
+
+elif page=="Comparison & Validation":
+    hero("Comparison & Validation",
+         "Compare Experimental, PLAXIS and Random Forest settlement results on the same phases.")
 
     st.markdown("""
     <div class="info-box">
-    <b>PLAXIS + Experimental Comparison</b><br>
-    Upload your PLAXIS screenshots, enter the numerical settlement value shown by PLAXIS,
-    and compare it phase-by-phase with experimental data or the included demo reference.
+    <b>Validation basis:</b> Experimental settlement is treated as the reference dataset.
+    PLAXIS and Random Forest predictions are compared against it using MAE, RMSE and R².
     </div>
-    """,unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-    files=st.file_uploader(
-        "📤 Upload PLAXIS result images",
-        type=["jpg","jpeg","png"],
-        accept_multiple_files=True,
-        help="Upload PLAXIS 2D Output screenshots."
+    st.markdown('<div class="section-title">1. Select comparison data</div>', unsafe_allow_html=True)
+
+    source = st.radio(
+        "Data source",
+        ["Use comparison CSV", "Use demo comparison data", "Enter values manually"],
+        horizontal=True
     )
 
-    phase_options=["30 Days","60 Days","90 Days","Other"]
-    result_options=["Total displacement uy","Vertical displacement uy","Settlement","Deformation","Other"]
+    comparison_df = None
 
-    # Comparison data source is intentionally kept inside the PLAXIS page only.
-    st.markdown('<div class="section-title">Comparison Data</div>',unsafe_allow_html=True)
-    source=st.radio(
-        "Reference data source",
-        ["Experimental CSV","Demo comparison data"],
-        horizontal=True,
-        key="plx_compare_source"
-    )
-
-    reference_df=None
-    if source=="Experimental CSV":
-        exp_file=st.file_uploader(
-            "Upload experimental settlement data (CSV)",
+    if source == "Use comparison CSV":
+        uploaded_compare = st.file_uploader(
+            "Upload comparison CSV",
             type=["csv"],
-            key="experimental_csv",
-            help="CSV should contain a phase column and a settlement_mm column. Example: phase,settlement_mm"
+            key="comparison_csv",
+            help="Required columns: phase, experimental_mm, plaxis_mm, random_forest_mm"
         )
-        if exp_file:
+
+        if uploaded_compare:
             try:
-                raw_exp=pd.read_csv(exp_file)
-                # Accept a few common names without changing the main model dataset.
-                rename_map={}
-                for col in raw_exp.columns:
-                    low=str(col).strip().lower().replace(" ","_")
-                    if low in ["phase","stage","time","days"]:
-                        rename_map[col]="phase"
-                    elif low in ["settlement_mm","settlement","settlement_(mm)","settlement_mm_"]:
-                        rename_map[col]="settlement_mm"
-                exp=raw_exp.rename(columns=rename_map)
-                if "phase" not in exp.columns or "settlement_mm" not in exp.columns:
-                    st.error("Experimental CSV needs columns like: phase, settlement_mm")
-                else:
-                    exp["settlement_mm"]=pd.to_numeric(exp["settlement_mm"],errors="coerce")
-                    exp=exp.dropna(subset=["settlement_mm"]).copy()
-                    exp["phase"]=exp["phase"].astype(str)
-                    reference_df=exp[["phase","settlement_mm"]].rename(columns={"settlement_mm":"Experimental (mm)"})
-                    st.success(f"{len(reference_df)} experimental records loaded.")
-                    st.dataframe(reference_df,use_container_width=True,hide_index=True)
+                comparison_df = pd.read_csv(uploaded_compare)
             except Exception as e:
-                st.error(f"Could not read experimental CSV: {e}")
-    else:
-        # Clearly labelled illustrative data for testing the comparison UI.
-        reference_df=pd.DataFrame({
-            "phase":["30 Days","60 Days","90 Days"],
-            "Experimental (mm)":[7.80,9.70,11.60]
-        })
-        st.info("Demo comparison data is illustrative only. Replace it with your experimental measurements for project results.")
-        st.dataframe(reference_df,use_container_width=True,hide_index=True)
-
-    if files:
-        st.markdown('<div class="section-title">PLAXIS Phase & Numerical Result</div>',unsafe_allow_html=True)
-        records=[]
-        for idx,file in enumerate(files):
-            c1,c2,c3,c4=st.columns([1.0,1.35,1.1,2.0])
-            with c1:
-                phase=st.selectbox("Phase",phase_options,key=f"plx_phase_{idx}")
-            with c2:
-                result_type=st.selectbox("Result",result_options,key=f"plx_result_{idx}")
-            with c3:
-                plx_value=st.number_input(
-                    "PLAXIS value (mm)",
-                    min_value=0.0,max_value=100000.0,value=0.0,step=0.01,
-                    key=f"plx_value_{idx}",
-                    help="Enter the numerical displacement/settlement read from PLAXIS Output. Leave 0 if not available."
-                )
-            with c4:
-                custom=st.text_input(
-                    "Description",key=f"plx_desc_{idx}",
-                    placeholder="e.g. reinforced track / clay subgrade"
-                )
-            records.append({
-                "phase":phase,
-                "result_type":result_type,
-                "plaxis_mm":float(plx_value),
-                "description":custom.strip() if custom.strip() else "—",
-                "file":file.name
-            })
-
-        st.markdown('<div class="section-title">PLAXIS Results Gallery</div>',unsafe_allow_html=True)
-        for start_idx in range(0,len(files),2):
-            cols=st.columns(2)
-            for j,file in enumerate(files[start_idx:start_idx+2]):
-                idx=start_idx+j
-                with cols[j]:
-                    r=records[idx]
-                    title=f"{r['phase']} • {r['result_type']}"
-                    if r["description"]!="—":
-                        title += f" • {r['description']}"
-                    st.markdown(f"""
-                    <div class="card">
-                        <div style="font-size:12px;color:#1687a7;font-weight:800">PLAXIS 2D OUTPUT</div>
-                        <div style="font-size:20px;font-weight:800;color:#10233e;margin:5px 0 12px">📌 {title}</div>
-                        <div style="font-size:12px;color:#64748b;margin-bottom:10px">File: {file.name}</div>
-                    """,unsafe_allow_html=True)
-                    st.image(Image.open(file),use_container_width=True)
-                    if r["plaxis_mm"]>0:
-                        st.metric("PLAXIS numerical result",f"{r['plaxis_mm']:.2f} mm")
-                    else:
-                        st.caption("No numerical PLAXIS value entered for this image.")
-                    st.markdown("</div>",unsafe_allow_html=True)
-
-        plx_df=pd.DataFrame(records)
-        st.markdown('<div class="section-title">Phase-wise Comparison</div>',unsafe_allow_html=True)
-
-        if reference_df is not None:
-            # Match by phase. For "Other", the user can still see the PLAXIS record in the table.
-            ref=reference_df.copy()
-            ref["phase"]=ref["phase"].astype(str)
-            comp=plx_df[["phase","result_type","plaxis_mm","description","file"]].copy()
-            comp=comp.merge(ref,on="phase",how="left")
-            comp=comp.rename(columns={"plaxis_mm":"PLAXIS (mm)"})
-            comp["Difference (mm)"]=np.where(
-                comp["Experimental (mm)"].notna() & (comp["PLAXIS (mm)"]>0),
-                comp["PLAXIS (mm)"]-comp["Experimental (mm)"],
-                np.nan
-            )
-            comp["Absolute Error (mm)"]=comp["Difference (mm)"].abs()
-            comp["Error (%)"]=np.where(
-                comp["Experimental (mm)"].notna() & (comp["Experimental (mm)"]!=0) & (comp["PLAXIS (mm)"]>0),
-                comp["Absolute Error (mm)"]/comp["Experimental (mm)"]*100,
-                np.nan
-            )
-            st.dataframe(comp,use_container_width=True,hide_index=True)
-
-            valid=comp.dropna(subset=["Experimental (mm)"]).copy()
-            valid=valid[valid["PLAXIS (mm)"]>0]
-            if not valid.empty:
-                a,b,c=st.columns(3)
-                a.metric("Compared phases",str(len(valid)))
-                b.metric("Mean absolute error",f"{valid['Absolute Error (mm)'].mean():.2f} mm")
-                b2=valid["Experimental (mm)"].replace(0,np.nan)
-                c.metric("Mean % error",f"{(valid['Absolute Error (mm)']/b2*100).mean():.2f}%")
-
-                chart_df=valid[["phase","Experimental (mm)","PLAXIS (mm)"]].set_index("phase")
-                st.line_chart(chart_df)
-                st.caption("Comparison uses the numerical PLAXIS values entered above; the screenshot itself is not numerically interpreted.")
+                st.error(f"Could not read the CSV: {e}")
+                st.stop()
         else:
-            st.info("Upload experimental CSV or choose Demo comparison data to generate the comparison table.")
+            st.markdown("""
+            <div class="card">
+            <b>Required CSV format</b><br><br>
+            phase, experimental_mm, plaxis_mm, random_forest_mm<br>
+            30 Days, 8.50, 8.90, 8.65<br>
+            60 Days, 10.20, 10.70, 10.35<br>
+            90 Days, 11.70, 11.84, 11.75
+            </div>
+            """, unsafe_allow_html=True)
 
-        st.markdown('<div class="section-title">PLAXIS File Summary</div>',unsafe_allow_html=True)
-        st.dataframe(plx_df,use_container_width=True,hide_index=True)
+    elif source == "Use demo comparison data":
+        comparison_df = pd.DataFrame({
+            "phase": ["30 Days", "60 Days", "90 Days"],
+            "experimental_mm": [8.50, 10.20, 11.70],
+            "plaxis_mm": [8.90, 10.70, 11.84],
+            "random_forest_mm": [8.65, 10.35, 11.75]
+        })
+        st.info("Demo comparison data is illustrative and is not experimental/project evidence.")
 
     else:
-        st.markdown("""
-        <div class="card" style="text-align:center;padding:55px">
-            <div style="font-size:55px">🖼️</div>
-            <h3>PLAXIS Output Gallery</h3>
-            <p style="color:#64748b">Upload JPG, JPEG or PNG screenshots, then enter the numerical PLAXIS settlement/displacement value to compare it with experimental or demo data.</p>
-        </div>
-        """,unsafe_allow_html=True)
+        st.markdown("Enter the values for the same phases/conditions used by all three methods.")
+        manual_default = pd.DataFrame({
+            "phase": ["30 Days", "60 Days", "90 Days"],
+            "experimental_mm": [0.0, 0.0, 0.0],
+            "plaxis_mm": [0.0, 0.0, 0.0],
+            "random_forest_mm": [0.0, 0.0, 0.0]
+        })
+        edited = st.data_editor(
+            manual_default,
+            num_rows="dynamic",
+            use_container_width=True,
+            key="manual_comparison_editor"
+        )
+        comparison_df = edited
+
+    if comparison_df is not None:
+        required_compare = ["phase", "experimental_mm", "plaxis_mm", "random_forest_mm"]
+        missing_compare = [c for c in required_compare if c not in comparison_df.columns]
+
+        if missing_compare:
+            st.error("Missing columns: " + ", ".join(missing_compare))
+            st.stop()
+
+        comparison_df = comparison_df[required_compare].copy()
+        for c in ["experimental_mm", "plaxis_mm", "random_forest_mm"]:
+            comparison_df[c] = pd.to_numeric(comparison_df[c], errors="coerce")
+
+        comparison_df = comparison_df.dropna(subset=required_compare).reset_index(drop=True)
+
+        if len(comparison_df) == 0:
+            st.warning("No valid comparison rows are available.")
+            st.stop()
+
+        st.markdown('<div class="section-title">2. Comparison dataset</div>', unsafe_allow_html=True)
+        st.dataframe(
+            comparison_df.rename(columns={
+                "phase": "Phase",
+                "experimental_mm": "Experimental (mm)",
+                "plaxis_mm": "PLAXIS (mm)",
+                "random_forest_mm": "Random Forest (mm)"
+            }),
+            use_container_width=True,
+            hide_index=True
+        )
+
+        # Error calculations against experimental reference.
+        exp = comparison_df["experimental_mm"].to_numpy(dtype=float)
+        plx = comparison_df["plaxis_mm"].to_numpy(dtype=float)
+        rf = comparison_df["random_forest_mm"].to_numpy(dtype=float)
+
+        plx_abs = np.abs(plx - exp)
+        rf_abs = np.abs(rf - exp)
+
+        plx_mae = float(np.mean(plx_abs))
+        rf_mae = float(np.mean(rf_abs))
+        plx_rmse = float(np.sqrt(np.mean((plx - exp) ** 2)))
+        rf_rmse = float(np.sqrt(np.mean((rf - exp) ** 2)))
+
+        # R² requires at least two non-constant reference values.
+        if len(exp) >= 2 and np.std(exp) > 0:
+            plx_r2 = float(r2_score(exp, plx))
+            rf_r2 = float(r2_score(exp, rf))
+        else:
+            plx_r2 = np.nan
+            rf_r2 = np.nan
+
+        st.markdown('<div class="section-title">3. Performance against Experimental Data</div>',
+                    unsafe_allow_html=True)
+
+        a, b, c = st.columns(3)
+        a.metric("PLAXIS MAE", f"{plx_mae:.3f} mm")
+        b.metric("PLAXIS RMSE", f"{plx_rmse:.3f} mm")
+        c.metric("PLAXIS R²", "N/A" if np.isnan(plx_r2) else f"{plx_r2:.4f}")
+
+        a, b, c = st.columns(3)
+        a.metric("Random Forest MAE", f"{rf_mae:.3f} mm")
+        b.metric("Random Forest RMSE", f"{rf_rmse:.3f} mm")
+        c.metric("Random Forest R²", "N/A" if np.isnan(rf_r2) else f"{rf_r2:.4f}")
+
+        # Phase-wise errors.
+        result_df = comparison_df.copy()
+        result_df["PLAXIS Error (mm)"] = plx_abs
+        result_df["RF Error (mm)"] = rf_abs
+        result_df["PLAXIS Error (%)"] = np.where(
+            exp != 0, (plx_abs / np.abs(exp)) * 100, np.nan
+        )
+        result_df["RF Error (%)"] = np.where(
+            exp != 0, (rf_abs / np.abs(exp)) * 100, np.nan
+        )
+
+        st.markdown('<div class="section-title">4. Phase-wise Error Analysis</div>',
+                    unsafe_allow_html=True)
+        st.dataframe(
+            result_df.rename(columns={
+                "phase": "Phase",
+                "experimental_mm": "Experimental (mm)",
+                "plaxis_mm": "PLAXIS (mm)",
+                "random_forest_mm": "Random Forest (mm)"
+            }),
+            use_container_width=True,
+            hide_index=True
+        )
+
+        # Overall winner: lower RMSE first, then lower MAE.
+        if rf_rmse < plx_rmse:
+            winner = "Random Forest"
+            reason = "lower RMSE against the Experimental reference."
+        elif plx_rmse < rf_rmse:
+            winner = "PLAXIS"
+            reason = "lower RMSE against the Experimental reference."
+        elif rf_mae < plx_mae:
+            winner = "Random Forest"
+            reason = "equal RMSE but lower MAE against the Experimental reference."
+        elif plx_mae < rf_mae:
+            winner = "PLAXIS"
+            reason = "equal RMSE but lower MAE against the Experimental reference."
+        else:
+            winner = "Tie"
+            reason = "both methods have the same calculated error."
+
+        st.markdown('<div class="section-title">5. Overall Validation Result</div>',
+                    unsafe_allow_html=True)
+
+        if winner == "Tie":
+            st.success("🏆 Overall result: TIE — both methods have the same calculated error.")
+        else:
+            st.success(f"🏆 Better agreement with Experimental Data: **{winner}** — {reason}")
+
+        chart_df = comparison_df.set_index("phase")[
+            ["experimental_mm", "plaxis_mm", "random_forest_mm"]
+        ].rename(columns={
+            "experimental_mm": "Experimental",
+            "plaxis_mm": "PLAXIS",
+            "random_forest_mm": "Random Forest"
+        })
+
+        st.markdown('<div class="section-title">6. Settlement Comparison</div>',
+                    unsafe_allow_html=True)
+        st.line_chart(chart_df, use_container_width=True)
+
+        # Downloadable validation report.
+        summary_df = pd.DataFrame({
+            "Method": ["PLAXIS", "Random Forest"],
+            "MAE (mm)": [plx_mae, rf_mae],
+            "RMSE (mm)": [plx_rmse, rf_rmse],
+            "R2": [plx_r2, rf_r2]
+        })
+
+        csv_report = result_df.to_csv(index=False)
+        st.download_button(
+            "⬇️ Download Comparison Results",
+            csv_report,
+            "experimental_plaxis_random_forest_comparison.csv",
+            "text/csv"
+        )
+
+        st.download_button(
+            "⬇️ Download Performance Summary",
+            summary_df.to_csv(index=False),
+            "model_performance_summary.csv",
+            "text/csv"
+        )
+
 
 elif page=="Settlement Predictor":
     hero("Settlement Predictor","Estimate subgrade settlement using the trained Random Forest model.")
